@@ -27,5 +27,13 @@ jobs:
 
     # Run the Insomnia collection
     - script: |
-        inso run collection demo
-      displayName: 'Run Insomnia Collection'
+        inso run collection demo -r junit > results.xml
+      displayName: 'Run Insomnia Tests'
+
+    # Publish results to Azure DevOps Test tab
+    - task: PublishTestResults@2
+      inputs:
+        testResultsFiles: 'results.xml'
+        testResultsFormat: 'JUnit'
+        failTaskOnFailedTests: true
+      displayName: 'Publish Test Results'
