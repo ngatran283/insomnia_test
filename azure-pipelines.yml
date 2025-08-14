@@ -7,83 +7,25 @@ trigger:
 - main
 
 pool:
-  name: 'Default'
-  
-steps:
-# 1. Install Node.js
-- task: NodeTool@0
-  inputs:
-    versionSpec: '18.x'
-  displayName: 'Install Node.js'
+  vmImage: 'ubuntu-latest'  # Microsoft-hosted agent
 
-# 2. Install Inso CLI
-- script: npm install -g insomnia-inso
-  displayName: 'Install Insomnia Inso CLI'
+jobs:
+- job: RunInsomniaTests
+  displayName: 'Run Insomnia API Tests'
+  steps:
 
-# 3. Run Insomnia tests with JUnit output
-- script: |
-    TEST_SUITE_ID=$(inso list test-suites --ci | head -n 1)
-    inso run test "$TEST_SUITE_ID" --reporter junit --ci > results.xml
-  displayName: 'Run Insomnia Tests'
+    # Install Node.js (required for insomnia-cli)
+    - task: NodeTool@0
+      inputs:
+        versionSpec: '16.x'
+      displayName: 'Install Node.js'
 
-# 4. Push results to Azure DevOps Test Plans
-- bash: |
-    set -e
+    # Install insomnia-cli globally
+    - script: |
+        npm install -g insomnia-cli
+      displayName: 'Install insomnia-cli'
 
-    ORG="ngatran283"
-    PROJECT="demo"
-    TEST_PLAN_ID=4
-    TEST_SUITE_ID=5
-    PAT="$(System.AccessToken)"
-    AUTH=$(echo ":$PAT" | base64)
-
-    # Create a new Test Run in Azure DevOps
-    RUN_NAME="API Test Run - $(date +%Y-%m-%d_%H-%M)"
-    RUN_DATA="{\"name\":\"$RUN_NAME\",\"plan\":{\"id\":$TEST_PLAN_ID}}"
-
-    RUN_ID=$(curl -s -X POST \
-      -H "Authorization: Basic $AUTH" \
-      -H "Content-Type: application/json" \
-      -d "$RUN_DATA" \
-      "https://dev.azure.com/$ORG/$PROJECT/_apis/test/runs?api-version=7.1-preview.1" \
-      | jq -r '.id')
-
-    echo "Created Test Run ID: $RUN_ID"
-
-    # Parse JUnit XML and push each result
-    xmllint --xpath "//testcase" results.xml | \
-    grep -oP 'name="\K[^"]+' | while read TESTNAME; do
-      
-      # Extract TC ID from test name
-      TC_ID=$(echo "$TESTNAME" | grep -oP 'TC\d+')
-      if [ -z "$TC_ID" ]; then
-        echo "Skipping test with no TC ID: $TESTNAME"
-        continue
-      fi
-
-      # For simplicity, mark all as Passed (you can parse <failure> in XML to set Failed)
-      OUTCOME="Passed"
-
-      RESULT_DATA="[{\"testCase\":{\"id\":${TC_ID#TC}},\"outcome\":\"$OUTCOME\"}]"
-
-      curl -s -X POST \
-        -H "Authorization: Basic $AUTH" \
-        -H "Content-Type: application/json" \
-        -d "$RESULT_DATA" \
-        "https://dev.azure.com/$ORG/$PROJECT/_apis/test/runs/$RUN_ID/results?api-version=7.1-preview.1" > /dev/null
-
-      echo "Pushed result for Test Case $TC_ID: $OUTCOME"
-    done
-
-    # Complete the Test Run
-    COMPLETE_DATA="{\"state\":\"Completed\"}"
-    curl -s -X PATCH \
-      -H "Authorization: Basic $AUTH" \
-      -H "Content-Type: application/json" \
-      -d "$COMPLETE_DATA" \
-      "https://dev.azure.com/$ORG/$PROJECT/_apis/test/runs/$RUN_ID?api-version=7.1-preview.1" > /dev/null
-
-    echo "Test Run $RUN_ID marked as Completed."
-  env:
-    System.AccessToken: $(System.AccessToken)
-  displayName: 'Update Azure DevOps Test Cases'
+    # Run the Insomnia collection
+    - script: |
+        insomnia-cli run ./demo.yaml
+      displayName: 'Run Insomnia Collection'
