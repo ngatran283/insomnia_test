@@ -7,7 +7,7 @@ trigger:
 - main
 
 pool:
-  vmImage: 'ubuntu-latest'  # Microsoft-hosted agent
+  name: 'Default'  # Microsoft-hosted agent
 
 jobs:
 - job: RunInsomniaTests
