@@ -22,10 +22,10 @@ jobs:
 
     # Install insomnia-cli globally
     - script: |
-        npm install -g insomnia-cli
+        brew install inso
       displayName: 'Install insomnia-cli'
 
     # Run the Insomnia collection
     - script: |
-        insomnia-cli run ./demo.yaml
+        inso run collection demo
       displayName: 'Run Insomnia Collection'
